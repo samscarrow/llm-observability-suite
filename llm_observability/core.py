@@ -25,7 +25,7 @@ __all__ = [
 
 _CONFIGURED = False
 _CURRENT_CONFIG: Optional[tuple[str, str, str, str]] = None
-_DEFAULT_SERVICE = os.getenv("SERVICE_NAME", "story-engine") or "story-engine"
+_DEFAULT_SERVICE = os.getenv("SERVICE_NAME", "llm-app") or "llm-app"
 _METRIC_LOGGER_NAME = "metrics"
 
 
@@ -117,7 +117,7 @@ class JsonLogFormatter(logging.Formatter):
 
 
 class _Adapter(logging.LoggerAdapter):
-    """Inject default story-engine context into log records."""
+    """Inject default service context into log records."""
 
     def process(self, msg: str, kwargs: Dict[str, Any]):
         extra = kwargs.setdefault("extra", {})
@@ -134,7 +134,7 @@ def init_logging_from_env(force: bool = False) -> None:
     fmt = (os.getenv("LOG_FORMAT", "json") or "json").strip().lower()
     dest = (os.getenv("LOG_DEST", "stderr") or "stderr").strip().lower()
     level_name = (os.getenv("LOG_LEVEL", "INFO") or "INFO").strip().upper()
-    file_path = os.getenv("LOG_FILE_PATH", "story_engine.log") or "story_engine.log"
+    file_path = os.getenv("LOG_FILE_PATH", "app.log") or "app.log"
 
     level = getattr(logging, level_name, logging.INFO)
 

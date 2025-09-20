@@ -1,3 +1,113 @@
 [![CI](https://github.com/samscarrow/llm-observability-suite/actions/workflows/ci.yml/badge.svg)](https://github.com/samscarrow/llm-observability-suite/actions/workflows/ci.yml)
 
 # LLM Observability Suite
+
+Lightweight, zero-deps-on-agents Python helpers for:
+
+- Structured JSON logging with contextual fields and redaction
+- Simple metrics via logs (counters and timers)
+- Optional DB event logging for generations (SQLAlchemy)
+
+Works well to instrument services like story engines, AI load balancers, and batch workers.
+
+Installation
+
+```
+pip install llm-observability-suite
+```
+
+Quick Start
+
+```python
+from llm_observability import get_logger, init_logging_from_env, timing, inc_metric, log_exception
+
+init_logging_from_env()  # or rely on env defaults
+log = get_logger("my.service", component="ingester")
+
+log.info("starting", extra={"job_id": "J-123"})
+
+try:
+    with timing("ingest.ms", component="ingester"):
+        # do work
+        inc_metric("ingest.rows", 5, table="items")
+except Exception as e:
+    log_exception(log, code="GEN_TIMEOUT", component="ingester", exc=e, job_id="J-123")
+```
+
+Metrics via Logs
+
+- `metric_event(metric, value=..., type=..., unit=..., **tags)`
+- `inc_metric(metric, n=1, **tags)`
+- `observe_metric(metric, value, unit="ms", **tags)`
+- `timing(metric, unit="ms", **tags)` context manager
+
+Note: metrics are serialized as a JSON string in the `message` field of the outer log record for easy downstream parsing.
+
+Environment Variables
+
+- `LOG_FORMAT`: `json` (default) or `text`
+- `LOG_DEST`: `stderr` (default), `stdout`, or `file`
+- `LOG_LEVEL`: e.g. `INFO`, `DEBUG`, `WARNING`
+- `LOG_FILE_PATH`: target file when `LOG_DEST=file` (default `story_engine.log`)
+- `SERVICE_NAME`: default `service` field if not provided per-logger
+- Optional context: `TRACE_ID`, `CORRELATION_ID` propagated by the logger adapter
+
+DB Event Logging
+
+For lightweight structured events (emitted to logs):
+
+```python
+from llm_observability import GenerationDBLogger
+
+genlog = GenerationDBLogger(enabled=True)
+genlog.log_event(
+    kind="attempt",
+    provider_name="openai",
+    provider_type="llm",
+    provider_endpoint="/v1/chat",
+    data={"attempt": 1},
+    model_key="gpt-4o",
+)
+```
+
+For relational inserts (best-effort, table must exist):
+
+```python
+from llm_observability import DBLogger
+
+dblog = DBLogger("sqlite:////var/log/observability/events.sqlite")
+dblog.log_event("generation_events", {
+    "job_id": "J-123",
+    "provider": "openai",
+    "model": "gpt-4o",
+    "status": "ok",
+})
+```
+
+Example SQLite schema:
+
+```sql
+CREATE TABLE IF NOT EXISTS generation_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  job_id TEXT,
+  provider TEXT,
+  model TEXT,
+  status TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+Security & Redaction
+
+- The JSON formatter redacts common sensitive keys: `api_key`, `authorization`, `password`, `db_password`, `oracle_password`.
+- Avoid logging raw prompts or PII; use IDs and hashes where possible.
+- If you need additional redaction, prefer filtering upstream before logging.
+
+Notes
+
+- Defaults are minimal and environment-driven; override `SERVICE_NAME` or pass `service=` to `get_logger`.
+- Metrics are emitted via logs; integrate with your log pipeline (e.g., Elasticsearch, Loki, or CloudWatch) to extract and aggregate.
+
+Changelog
+
+See `CHANGELOG.md` for release notes and breaking changes.

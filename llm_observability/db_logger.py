@@ -1,4 +1,4 @@
-"""Database logging shims used by story-engine."""
+"""Database logging helpers for applications using this suite."""
 
 from __future__ import annotations
 
@@ -68,4 +68,3 @@ class DBLogger:
 
         with self._engine.begin() as conn:
             conn.execute(stmt, event_data)
-
