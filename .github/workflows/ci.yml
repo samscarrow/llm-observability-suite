@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * *'
+
+jobs:
+  build-test:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [ '3.10', '3.11', '3.12' ]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-${{ matrix.python-version }}-
+
+      - name: Install project and tools
+        run: |
+          python -m pip install --upgrade pip
+          if grep -q "\[project\]" pyproject.toml; then
+            pip install -e .
+          else
+            pip install . || true
+          fi
+          # Tools kept lean and fast
+          pip install pytest pytest-cov ruff mypy build
+
+      - name: Lint (ruff)
+        run: |
+          if [ -f ruff.toml ] || [ -f .ruff.toml ] || rg -n "\[tool.ruff\]" pyproject.toml >/dev/null 2>&1; then
+            ruff check .
+          else
+            echo "No ruff config; running with defaults"
+            ruff check . || true
+          fi
+
+      - name: Type check (mypy)
+        run: |
+          if [ -f mypy.ini ] || [ -f setup.cfg ] || rg -n "\[tool.mypy\]" pyproject.toml >/dev/null 2>&1; then
+            mypy .
+          else
+            echo "No mypy config; running basic type check"
+            mypy . || true
+          fi
+
+      - name: Run tests
+        env:
+          PYTHONWARNINGS: default
+        run: |
+          if rg -n "pytest" pyproject.toml >/dev/null 2>&1 || [ -d tests ] || rg -n "def test_" -g "**/*.py" >/dev/null 2>&1; then
+            pytest -q --maxfail=1 --disable-warnings --cov=. --cov-report=xml --durations=10
+          else
+            echo "No tests detected; skipping"
+          fi
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.python-version }}
+          path: |
+            coverage.xml
+          if-no-files-found: ignore
+
+      - name: Build package
+        run: |
+          python -m build
+          ls -la dist || true
+
