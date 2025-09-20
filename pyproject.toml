@@ -30,4 +30,14 @@ Homepage = "https://example.com/llm-observability-suite"
 Repository = "https://example.com/llm-observability-suite.git"
 
 [tool.setuptools]
-packages = ["llm_observability"]
+packages = ["llm_observability", "audio", "compass_agent"]
+
+[project.optional-dependencies]
+audio = [
+    "webrtcvad",
+    "sounddevice",
+    "numpy",
+]
+
+[project.scripts]
+compass-agent = "compass_agent.cli:main"

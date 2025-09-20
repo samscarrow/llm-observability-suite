@@ -111,3 +111,9 @@ Notes
 Changelog
 
 See `CHANGELOG.md` for release notes and breaking changes.
+
+VAD Gating Demo
+
+- Install audio extras: `pip install .[audio]`
+- Run: `compass-agent demo --vad --aggr 2 --silence-ms 700 --pre-roll-ms 300`
+- Prints wake events and segment timings (t0/t1). Uses webrtcvad under the hood; segments end ~0.7–0.8s after speech stops and include pre-roll.
