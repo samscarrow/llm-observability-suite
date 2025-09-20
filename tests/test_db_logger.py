@@ -1,12 +1,10 @@
 import json
-import os
 import sqlite3
-import tempfile
 from pathlib import Path
 
 import pytest
 
-from llm_observability import GenerationDBLogger, DBLogger, init_logging_from_env
+from llm_observability import GenerationDBLogger, DBLogger, init_logging_from_env, JsonLogFormatter
 
 
 @pytest.fixture(autouse=True)
@@ -22,12 +20,15 @@ def _reset_logging(monkeypatch: pytest.MonkeyPatch):
     yield
 
 
-def parse_inner_message(payload: str) -> dict:
-    outer = json.loads(payload)
+def parse_inner_message_from_caplog(caplog) -> dict:
+    assert caplog.records, "no log records captured"
+    rec = caplog.records[-1]
+    formatted = JsonLogFormatter().format(rec)
+    outer = json.loads(formatted)
     return json.loads(outer["message"]) if isinstance(outer.get("message"), str) else {}
 
 
-def test_generation_db_logger_emits_when_enabled(capsys):
+def test_generation_db_logger_emits_when_enabled(caplog):
     g = GenerationDBLogger(enabled=True, logger_name="observability.db")
     g.log_event(
         kind="attempt",
@@ -38,9 +39,7 @@ def test_generation_db_logger_emits_when_enabled(capsys):
         model_key="gpt-4o",
     )
 
-    out = capsys.readouterr().out.strip().splitlines()
-    assert out
-    inner = parse_inner_message(out[-1])
+    inner = parse_inner_message_from_caplog(caplog)
     assert inner["event"] == "generation_db_log"
     assert inner["kind"] == "attempt"
     assert inner["provider_name"] == "openai"
@@ -86,4 +85,3 @@ def test_db_logger_inserts_into_sqlite_file(tmp_path: Path):
         cur = conn.execute("SELECT name, value, note FROM events ORDER BY id ASC")
         rows = cur.fetchall()
         assert ("row1", 42, "ok") in rows
-

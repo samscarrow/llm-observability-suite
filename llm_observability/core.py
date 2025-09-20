@@ -120,10 +120,18 @@ class _Adapter(logging.LoggerAdapter):
     """Inject default service context into log records."""
 
     def process(self, msg: str, kwargs: Dict[str, Any]):
-        extra = kwargs.setdefault("extra", {})
-        extra.setdefault("service", _DEFAULT_SERVICE)
-        extra.setdefault("trace_id", os.getenv("TRACE_ID", ""))
-        extra.setdefault("correlation_id", os.getenv("CORRELATION_ID", ""))
+        merged = dict(self.extra) if getattr(self, "extra", None) else {}
+        extra = kwargs.get("extra", {})
+        if extra:
+            try:
+                merged.update(extra)
+            except Exception:
+                pass
+        kwargs["extra"] = merged
+        # Resolve service at runtime to honor SERVICE_NAME set after import
+        merged.setdefault("service", os.getenv("SERVICE_NAME", _DEFAULT_SERVICE) or _DEFAULT_SERVICE)
+        merged.setdefault("trace_id", os.getenv("TRACE_ID", ""))
+        merged.setdefault("correlation_id", os.getenv("CORRELATION_ID", ""))
         return msg, kwargs
 
 
@@ -195,12 +203,14 @@ def log_exception(
 
     payload = {
         "event": "error",
-        "error_code": str(code),
+        "error_code": (code.value if isinstance(code, ErrorCodes) else str(code)),
         "component": component,
         "error": str(exc),
     }
     payload.update(context)
-    logger.error(str(exc), extra=payload)
+    tb = getattr(exc, "__traceback__", None)
+    exc_info = (type(exc), exc, tb)
+    logger.error(str(exc), extra=payload, exc_info=exc_info)
 
 
 def _metric_logger() -> logging.LoggerAdapter:

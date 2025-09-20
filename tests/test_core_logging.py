@@ -1,7 +1,4 @@
-import io
 import json
-import logging
-import os
 from typing import Any
 
 import pytest
@@ -11,6 +8,7 @@ from llm_observability import (
     get_logger,
     init_logging_from_env,
     log_exception,
+    JsonLogFormatter,
 )
 
 
@@ -31,16 +29,17 @@ def _reset_logging(monkeypatch: pytest.MonkeyPatch):
     yield
 
 
-def read_last_json_line(capsys) -> dict[str, Any]:
-    out = capsys.readouterr().out.strip().splitlines()
-    assert out, "expected at least one line of output"
-    return json.loads(out[-1])
+def formatted_last_record(caplog) -> dict[str, Any]:
+    assert caplog.records, "no log records captured"
+    rec = caplog.records[-1]
+    formatted = JsonLogFormatter().format(rec)
+    return json.loads(formatted)
 
 
-def test_structured_info_log_with_redaction(capsys):
+def test_structured_info_log_with_redaction(caplog):
     logger = get_logger("unit.core", component="worker", endpoint="/api")
     logger.info("hello", extra={"custom": "x", "api_key": "secret"})
-    payload = read_last_json_line(capsys)
+    payload = formatted_last_record(caplog)
 
     assert payload["level"] == "INFO"
     assert payload["name"] == "unit.core"
@@ -55,14 +54,14 @@ def test_structured_info_log_with_redaction(capsys):
     assert payload["api_key"] == "[REDACTED]"
 
 
-def test_log_exception_includes_code_and_exc(capsys):
+def test_log_exception_includes_code_and_exc(caplog):
     logger = get_logger("unit.core")
     try:
         raise ValueError("BOOM")
     except Exception as e:  # noqa: PERF203
         log_exception(logger, code=ErrorCodes.GEN_PARSE_ERROR, component="parser", exc=e, step="phase1")
 
-    payload = read_last_json_line(capsys)
+    payload = formatted_last_record(caplog)
     assert payload["level"] == "ERROR"
     assert payload["event"] == "error"
     assert payload["error_code"] == ErrorCodes.GEN_PARSE_ERROR
@@ -70,4 +69,3 @@ def test_log_exception_includes_code_and_exc(capsys):
     assert payload["error"].startswith("BOOM") or payload["message"].startswith("BOOM")
     # exc_info field is optional but should exist for exceptions
     assert "exc_info" in payload
-

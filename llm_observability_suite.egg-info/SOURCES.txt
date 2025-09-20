@@ -8,3 +8,6 @@ llm_observability_suite.egg-info/SOURCES.txt
 llm_observability_suite.egg-info/dependency_links.txt
 llm_observability_suite.egg-info/requires.txt
 llm_observability_suite.egg-info/top_level.txt
+tests/test_core_logging.py
+tests/test_db_logger.py
+tests/test_metrics.py
