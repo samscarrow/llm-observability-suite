@@ -1,0 +1,33 @@
+[project]
+name = "llm-observability-suite"
+version = "0.1.0"
+description = "A suite for LLM observability."
+authors = [{ name = "Gemini", email = "gemini@example.com" }]
+requires-python = ">=3.8"
+dependencies = [
+    "sqlalchemy"
+]
+readme = "README.md"
+license = { text = "Proprietary" }
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: Other/Proprietary License",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries",
+]
+keywords = ["logging", "observability", "metrics", "llm"]
+
+[project.urls]
+Homepage = "https://example.com/llm-observability-suite"
+Repository = "https://example.com/llm-observability-suite.git"
+
+[tool.setuptools]
+packages = ["llm_observability"]

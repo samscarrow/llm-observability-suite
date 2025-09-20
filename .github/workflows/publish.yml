@@ -1,0 +1,69 @@
+name: Publish llm-observability-suite
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      release:
+        description: 'Publish to PyPI (true) or TestPyPI (false)'
+        required: false
+        default: 'false'
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install packaging tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+      - name: Build distributions
+        run: |
+          python -m build
+      - name: Publish to TestPyPI on tag
+        if: github.event_name == 'push'
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.TEST_PYPI_TOKEN }}
+        run: |
+          twine upload --repository-url https://test.pypi.org/legacy/ dist/*
+      - name: Publish to PyPI (manual)
+        if: github.event_name == 'workflow_dispatch' && inputs.release == 'true'
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+        run: |
+          twine upload dist/*
+
+  # Example job for AWS CodeArtifact (optional)
+  # codeartifact-publish:
+  #   if: github.event_name == 'workflow_dispatch' && inputs.release == 'true'
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-python@v5
+  #       with:
+  #         python-version: '3.12'
+  #     - run: |
+  #         python -m pip install --upgrade pip
+  #         pip install build twine awscli
+  #         python -m build
+  #     - name: Login to CodeArtifact
+  #       run: |
+  #         aws codeartifact login \
+  #           --tool twine \
+  #           --domain ${{ secrets.CA_DOMAIN }} \
+  #           --domain-owner ${{ secrets.CA_ACCOUNT }} \
+  #           --repository ${{ secrets.CA_REPOSITORY }}
+  #     - name: Upload to CodeArtifact
+  #       run: |
+  #         twine upload --repository codeartifact dist/*
+
